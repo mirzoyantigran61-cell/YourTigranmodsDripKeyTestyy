@@ -1,397 +1,159 @@
 // ========================================
-// SLIDE GENERATOR
-// Отрисовывает слайды в HTML и генерирует превью
+// SLIDE GENERATOR v3.0 PRO
+// Умная вёрстка, все лэйауты, адаптив
 // ========================================
 
 class SlideGenerator {
     constructor() {
-        this.currentSlide = null;
         this.designSystem = null;
     }
 
-    /**
-     * Установить дизайн-систему
-     */
-    setDesignSystem(design) {
-        this.designSystem = design;
+    setDesignSystem(d) { this.designSystem = d || APP_CONFIG?.themes?.cyberpunk || this.defaultDesign(); }
+    defaultDesign() { return { primary: '#FF0000', secondary: '#FF0055', accent: '#8B5CF6', background: '#090909', surface: '#171717', text: '#F5F5F5', textSecondary: '#B8B8B8', font: 'Orbitron' }; }
+
+    renderSlide(slide, container) {
+        const ds = this.designSystem || this.defaultDesign();
+        const layout = slide.layout || 'content';
+        const methodName = 'render_' + layout;
+        const html = typeof this[methodName] === 'function' ? this[methodName](slide, ds) : this.render_content(slide, ds);
+        container.innerHTML = `<div style="width:100%;height:100%;background:${ds.background};padding:40px;position:relative;overflow:hidden;border-radius:12px;">
+            <div style="position:absolute;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,${ds.primary},${ds.secondary},${ds.accent});"></div>
+            ${html}
+            <div style="position:absolute;bottom:12px;right:24px;font-size:10px;color:${ds.textSecondary};opacity:0.4;">YourTigranmods AI</div>
+        </div>`;
     }
 
-    /**
-     * Главный метод — рендерит слайд в контейнер
-     */
-    renderSlide(slide, container) {
-        if (!this.designSystem) {
-            this.designSystem = APP_CONFIG.themes.cyberpunk;
-        }
-        
-        this.currentSlide = slide;
-        
-        const design = this.designSystem;
-        let html = '';
-        
-        // Общая обёртка с фоном
-        html += `
-        <div style="width: 100%; height: 100%; background: ${design.background}; 
-            padding: 50px; position: relative; overflow: hidden; border-radius: 12px;">
-            
-            <!-- Декоративная линия сверху -->
-            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 4px; 
-                background: linear-gradient(90deg, ${design.primary}, ${design.secondary}, ${design.accent});"></div>
-            
-            <!-- Номер слайда -->
-            <div style="position: absolute; top: 20px; right: 30px; 
-                font-family: 'Orbitron', sans-serif; font-size: 12px; color: ${design.textSecondary}; 
-                opacity: 0.6;">
-                ${String(slide.id || 1).padStart(2, '0')} / ${String(slide.total || 10).padStart(2, '0')}
-            </div>
-        `;
-        
-        // Тип слайда определяет лэйаут
-        switch (slide.type) {
-            case 'hero':
-                html += this.renderHero(slide, design);
-                break;
-            case 'agenda':
-                html += this.renderAgenda(slide, design);
-                break;
-            case 'content':
-                html += this.renderContent(slide, design);
-                break;
-            case 'two_column':
-                html += this.renderTwoColumn(slide, design);
-                break;
-            case 'stats':
-                html += this.renderStats(slide, design);
-                break;
-            case 'cta':
-                html += this.renderCTA(slide, design);
-                break;
-            default:
-                html += this.renderDefault(slide, design);
-        }
-        
-        // Закрываем обёртку
-        html += `
-            <!-- Логотип внизу -->
-            <div style="position: absolute; bottom: 20px; left: 50px; 
-                font-family: 'Orbitron', sans-serif; font-size: 10px; color: ${design.textSecondary}; 
-                opacity: 0.4;">
-                YourTigranmods AI Presentation
+    // ========== ЛЭЙАУТЫ ==========
+
+    render_hero(slide, ds) {
+        return `<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">
+            <div style="font-size:56px;margin-bottom:20px;">${slide.topic || '🚀'}</div>
+            <h1 style="font-family:${ds.font},sans-serif;font-size:clamp(24px,5vw,44px);font-weight:900;background:linear-gradient(135deg,${ds.primary},${ds.accent});-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:16px;max-width:85%;line-height:1.2;">${slide.title}</h1>
+            <p style="font-size:clamp(14px,2vw,18px);color:${ds.textSecondary};max-width:65%;line-height:1.5;">${slide.content}</p>
+            <div style="width:80px;height:3px;background:linear-gradient(90deg,transparent,${ds.primary},transparent);margin-top:24px;"></div>
+        </div>`;
+    }
+
+    render_content(slide, ds) {
+        const text = this.processText(slide.content);
+        const fontSize = text.length > 300 ? '14px' : text.length > 150 ? '16px' : '18px';
+        return `<div style="height:100%;display:flex;flex-direction:column;">
+            <h2 style="font-family:${ds.font},sans-serif;font-size:clamp(18px,3vw,26px);color:${ds.primary};margin-bottom:20px;border-bottom:2px solid ${ds.primary}33;padding-bottom:10px;">${slide.title}</h2>
+            <div style="flex:1;overflow-y:auto;font-size:${fontSize};color:${ds.text};line-height:1.7;">${text}</div>
+        </div>`;
+    }
+
+    render_two_column(slide, ds) {
+        const text = this.processText(slide.content);
+        const mid = Math.ceil(text.length / 2);
+        const left = text.substring(0, mid);
+        const right = text.substring(mid);
+        return `<div style="height:100%;">
+            <h2 style="font-family:${ds.font},sans-serif;font-size:clamp(16px,2.5vw,22px);color:${ds.primary};margin-bottom:16px;">${slide.title}</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;height:calc(100% - 50px);">
+                <div style="background:${ds.surface};border-radius:12px;padding:20px;border-left:3px solid ${ds.primary};overflow-y:auto;font-size:14px;color:${ds.text};line-height:1.6;">${left}</div>
+                <div style="background:${ds.surface};border-radius:12px;padding:20px;border-left:3px solid ${ds.accent};overflow-y:auto;font-size:14px;color:${ds.text};line-height:1.6;">${right}</div>
             </div>
         </div>`;
-        
-        container.innerHTML = html;
     }
 
-    /**
-     * Hero слайд (титульный)
-     */
-    renderHero(slide, design) {
-        return `
-            <div style="display: flex; flex-direction: column; justify-content: center; 
-                align-items: center; height: 100%; text-align: center;">
-                
-                <!-- Иконка/эмодзи -->
-                <div style="font-size: 64px; margin-bottom: 30px; 
-                    filter: drop-shadow(0 0 20px ${design.primary});">
-                    🚀
-                </div>
-                
-                <!-- Заголовок -->
-                <h1 style="font-family: 'Orbitron', sans-serif; font-size: 48px; font-weight: 900;
-                    background: linear-gradient(135deg, ${design.primary}, ${design.accent});
-                    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-                    margin-bottom: 20px; max-width: 80%; line-height: 1.2;">
-                    ${slide.title}
-                </h1>
-                
-                <!-- Подзаголовок -->
-                <p style="font-family: 'Inter', sans-serif; font-size: 20px; 
-                    color: ${design.textSecondary}; max-width: 60%; line-height: 1.5;">
-                    ${slide.content}
-                </p>
-                
-                <!-- Декоративная линия -->
-                <div style="width: 120px; height: 3px; 
-                    background: linear-gradient(90deg, transparent, ${design.primary}, transparent);
-                    margin-top: 30px;"></div>
+    render_split(slide, ds) {
+        const text = this.processText(slide.content);
+        const lines = text.split(/[.!?]+/).filter(s => s.trim());
+        const mid = Math.ceil(lines.length / 2);
+        return `<div style="height:100%;">
+            <h2 style="font-family:${ds.font},sans-serif;font-size:clamp(16px,2.5vw,22px);color:${ds.primary};margin-bottom:16px;">${slide.title}</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div>${lines.slice(0,mid).map(l=>`<p style="font-size:13px;color:${ds.text};margin-bottom:8px;line-height:1.5;">• ${l.trim()}</p>`).join('')}</div>
+                <div>${lines.slice(mid).map(l=>`<p style="font-size:13px;color:${ds.text};margin-bottom:8px;line-height:1.5;">• ${l.trim()}</p>`).join('')}</div>
             </div>
-        `;
+        </div>`;
     }
 
-    /**
-     * Agenda слайд (содержание)
-     */
-    renderAgenda(slide, design) {
-        const items = Array.isArray(slide.content) ? slide.content : 
-            ['Introduction', 'Main Points', 'Analysis', 'Conclusion'];
-        
-        const itemsHtml = items.map((item, i) => `
-            <div style="display: flex; align-items: center; gap: 20px; 
-                padding: 18px 24px; margin-bottom: 12px;
-                background: ${design.surface}; border-radius: 12px;
-                border-left: 3px solid ${design.primary};
-                transition: all 0.3s;"
-                onmouseover="this.style.transform='translateX(10px)'; this.style.background='${design.surface}CC';"
-                onmouseout="this.style.transform='translateX(0)'; this.style.background='${design.surface}';">
-                
-                <!-- Номер -->
-                <span style="font-family: 'Orbitron', sans-serif; font-size: 28px; font-weight: 700;
-                    color: ${design.primary}; min-width: 50px; text-align: center;">
-                    ${String(i + 1).padStart(2, '0')}
-                </span>
-                
-                <!-- Текст -->
-                <span style="font-family: 'Inter', sans-serif; font-size: 18px; 
-                    color: ${design.text}; flex: 1;">
-                    ${item}
-                </span>
-                
-                <!-- Стрелка -->
-                <span style="color: ${design.primary}; opacity: 0.5;">→</span>
+    render_image_right(slide, ds) {
+        const img = slide.userImage || slide.image || '';
+        const text = this.processText(slide.content, 300);
+        return `<div style="height:100%;display:flex;gap:24px;">
+            <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+                <h2 style="font-family:${ds.font},sans-serif;font-size:clamp(16px,2.5vw,22px);color:${ds.primary};margin-bottom:16px;">${slide.title}</h2>
+                <p style="font-size:15px;color:${ds.text};line-height:1.7;">${text}</p>
+            </div>
+            <div style="width:42%;display:flex;align-items:center;justify-content:center;">
+                ${img ? `<img src="${img}" style="width:100%;max-height:85%;object-fit:cover;border-radius:16px;border:2px solid ${ds.primary};box-shadow:0 0 30px ${ds.primary}33;">` : `<div style="width:100%;height:70%;background:${ds.surface};border-radius:16px;display:flex;align-items:center;justify-content:center;color:${ds.textSecondary};">📷</div>`}
+            </div>
+        </div>`;
+    }
+
+    render_comparison(slide, ds) {
+        return `<div style="height:100%;">
+            <h2 style="font-family:${ds.font},sans-serif;font-size:clamp(16px,2.5vw,22px);color:${ds.primary};margin-bottom:16px;text-align:center;">${slide.title}</h2>
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;height:calc(100% - 50px);">
+                <div style="background:${ds.surface};border-radius:12px;padding:20px;text-align:center;">
+                    <h3 style="color:${ds.primary};font-size:18px;">A</h3>
+                    <p style="color:${ds.text};font-size:13px;">${this.processText(slide.content, 150)}</p>
+                </div>
+                <div style="font-size:32px;color:${ds.primary};font-weight:900;">VS</div>
+                <div style="background:${ds.surface};border-radius:12px;padding:20px;text-align:center;">
+                    <h3 style="color:${ds.accent};font-size:18px;">B</h3>
+                    <p style="color:${ds.text};font-size:13px;">${this.processText(slide.content, 150)}</p>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    render_stats(slide, ds) {
+        return `<div style="height:100%;">
+            <h2 style="font-family:${ds.font},sans-serif;font-size:clamp(16px,2.5vw,22px);color:${ds.primary};margin-bottom:20px;text-align:center;">${slide.title}</h2>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px;">
+                ${(slide.stats || [{v:'📊',l:'Data'},{v:'📈',l:'Growth'},{v:'🎯',l:'Target'},{v:'✅',l:'Done'}]).map(s=>`
+                    <div style="background:${ds.surface};border-radius:12px;padding:20px;text-align:center;border:1px solid ${ds.primary}22;">
+                        <div style="font-size:28px;font-weight:900;color:${ds.primary};">${s.v}</div>
+                        <div style="font-size:11px;color:${ds.textSecondary};text-transform:uppercase;">${s.l}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+    }
+
+    render_cta(slide, ds) {
+        return `<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">
+            <div style="font-size:56px;margin-bottom:20px;">🔥</div>
+            <h2 style="font-family:${ds.font},sans-serif;font-size:clamp(22px,4vw,36px);color:${ds.primary};margin-bottom:12px;">${slide.title}</h2>
+            <p style="font-size:16px;color:${ds.textSecondary};max-width:55%;margin-bottom:24px;">${slide.content}</p>
+            <div style="background:linear-gradient(135deg,${ds.primary},${ds.secondary});padding:12px 32px;border-radius:50px;color:white;font-weight:700;">${slide.button || 'Get Started'} →</div>
+        </div>`;
+    }
+
+    // ========== ВСПОМОГАТЕЛЬНЫЕ ==========
+
+    processText(text, maxLen = 0) {
+        if (!text) return '';
+        let t = String(text);
+        if (maxLen > 0 && t.length > maxLen) t = t.substring(0, maxLen) + '...';
+        return t.replace(/\n/g, '<br>');
+    }
+
+    createAllThumbnails(slides, activeIdx) {
+        const ds = this.designSystem || this.defaultDesign();
+        return slides.map((s, i) => `
+            <div class="slide-thumb" data-slide-index="${i}" style="min-width:160px;height:85px;background:${i===activeIdx?ds.surface:ds.background};border:2px solid ${i===activeIdx?ds.primary:ds.surface};border-radius:8px;padding:10px;cursor:pointer;transition:0.3s;position:relative;">
+                <div style="font-size:14px;">${s.type==='hero'?'🚀':s.type==='cta'?'🎯':'📄'}</div>
+                <p style="font-size:10px;color:${ds.text};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:4px 0 0;">${s.title}</p>
+                ${i===activeIdx?`<div style="position:absolute;bottom:0;left:0;width:100%;height:2px;background:${ds.primary};"></div>`:''}
             </div>
         `).join('');
-        
-        return `
-            <div style="height: 100%;">
-                <h2 style="font-family: 'Orbitron', sans-serif; font-size: 32px; 
-                    color: ${design.primary}; margin-bottom: 30px;">
-                    📋 ${slide.title}
-                </h2>
-                <div style="max-width: 700px; margin: 0 auto;">
-                    ${itemsHtml}
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * Content слайд (обычный контент)
-     */
-    renderContent(slide, design) {
-        // Разбиваем контент на буллиты если это строка
-        const bullets = typeof slide.content === 'string' ? 
-            slide.content.split('.').filter(b => b.trim()).map(b => b.trim() + '.') :
-            slide.content;
-        
-        const bulletsHtml = Array.isArray(bullets) ? bullets.map(bullet => `
-            <li style="margin-bottom: 16px; font-family: 'Inter', sans-serif; font-size: 16px;
-                color: ${design.text}; line-height: 1.6; padding-left: 8px;">
-                <span style="color: ${design.primary}; margin-right: 8px;">▸</span>
-                ${bullet}
-            </li>
-        `).join('') : `<p style="color: ${design.text};">${slide.content}</p>`;
-        
-        return `
-            <div style="height: 100%; display: flex; flex-direction: column;">
-                <h2 style="font-family: 'Orbitron', sans-serif; font-size: 32px; 
-                    color: ${design.primary}; margin-bottom: 30px;
-                    border-bottom: 2px solid ${design.primary}33; padding-bottom: 15px;">
-                    ${slide.title}
-                </h2>
-                <ul style="list-style: none; padding: 0; margin: 0; flex: 1;">
-                    ${bulletsHtml}
-                </ul>
-            </div>
-        `;
-    }
-
-    /**
-     * Two Column слайд
-     */
-    renderTwoColumn(slide, design) {
-        return `
-            <div style="height: 100%;">
-                <h2 style="font-family: 'Orbitron', sans-serif; font-size: 28px; 
-                    color: ${design.primary}; margin-bottom: 30px;">
-                    ${slide.title}
-                </h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; height: calc(100% - 80px);">
-                    
-                    <!-- Левая колонка -->
-                    <div style="background: ${design.surface}; border-radius: 16px; padding: 30px;
-                        border: 1px solid ${design.primary}22;">
-                        <h3 style="font-family: 'Orbitron', sans-serif; font-size: 20px; 
-                            color: ${design.primary}; margin-bottom: 20px;">
-                            📊 Key Points
-                        </h3>
-                        <p style="color: ${design.text}; line-height: 1.8; font-size: 15px;">
-                            ${slide.content}
-                        </p>
-                    </div>
-                    
-                    <!-- Правая колонка -->
-                    <div style="background: ${design.surface}; border-radius: 16px; padding: 30px;
-                        border: 1px solid ${design.accent}22; display: flex; align-items: center; justify-content: center;">
-                        <div style="text-align: center;">
-                            <div style="font-size: 80px; margin-bottom: 20px; opacity: 0.6;">🎯</div>
-                            <p style="font-family: 'Orbitron', sans-serif; color: ${design.accent}; 
-                                font-size: 14px;">
-                                Visual Placeholder
-                            </p>
-                        </div>
-                    </div>
-                    
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * Stats слайд
-     */
-    renderStats(slide, design) {
-        const stats = slide.stats || [
-            { value: '10K+', label: 'Users' },
-            { value: '50+', label: 'Countries' },
-            { value: '99%', label: 'Uptime' },
-            { value: '4.9', label: 'Rating' }
-        ];
-        
-        const statsHtml = stats.map(stat => `
-            <div style="background: ${design.surface}; border-radius: 16px; padding: 30px; 
-                text-align: center; border: 1px solid ${design.primary}22;
-                transition: all 0.3s;"
-                onmouseover="this.style.transform='translateY(-5px)'; this.style.borderColor='${design.primary}';"
-                onmouseout="this.style.transform='translateY(0)'; this.style.borderColor='${design.primary}22';">
-                
-                <div style="font-family: 'Orbitron', sans-serif; font-size: 42px; font-weight: 900;
-                    background: linear-gradient(135deg, ${design.primary}, ${design.secondary});
-                    -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                    ${stat.value}
-                </div>
-                <div style="font-family: 'Inter', sans-serif; font-size: 14px; 
-                    color: ${design.textSecondary}; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px;">
-                    ${stat.label}
-                </div>
-            </div>
-        `).join('');
-        
-        return `
-            <div style="height: 100%;">
-                <h2 style="font-family: 'Orbitron', sans-serif; font-size: 32px; 
-                    color: ${design.primary}; margin-bottom: 30px; text-align: center;">
-                    ${slide.title}
-                </h2>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
-                    gap: 20px;">
-                    ${statsHtml}
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * CTA слайд (финальный)
-     */
-    renderCTA(slide, design) {
-        return `
-            <div style="display: flex; flex-direction: column; justify-content: center; 
-                align-items: center; height: 100%; text-align: center;">
-                
-                <!-- Большая иконка -->
-                <div style="font-size: 80px; margin-bottom: 30px;
-                    filter: drop-shadow(0 0 30px ${design.primary});">
-                    🔥
-                </div>
-                
-                <!-- Заголовок -->
-                <h2 style="font-family: 'Orbitron', sans-serif; font-size: 44px; font-weight: 900;
-                    color: ${design.primary}; margin-bottom: 20px;">
-                    ${slide.title}
-                </h2>
-                
-                <!-- Контент -->
-                <p style="font-family: 'Inter', sans-serif; font-size: 20px; 
-                    color: ${design.textSecondary}; max-width: 60%; margin-bottom: 30px;">
-                    ${slide.content}
-                </p>
-                
-                <!-- Кнопка -->
-                <div style="background: linear-gradient(135deg, ${design.primary}, ${design.secondary});
-                    padding: 16px 40px; border-radius: 50px; font-family: 'Orbitron', sans-serif;
-                    font-size: 18px; color: white; cursor: pointer; transition: all 0.3s;
-                    box-shadow: 0 0 30px ${design.primary}44;"
-                    onmouseover="this.style.transform='scale(1.05)';"
-                    onmouseout="this.style.transform='scale(1)';">
-                    Get Started →
-                </div>
-                
-                <!-- Контакты -->
-                <div style="margin-top: 40px; font-family: 'Inter', sans-serif; font-size: 14px;
-                    color: ${design.textSecondary}; opacity: 0.6;">
-                    YourTigranmods AI • @YourTigranmods
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * Default слайд (запасной)
-     */
-    renderDefault(slide, design) {
-        return `
-            <div style="height: 100%;">
-                <h2 style="font-family: 'Orbitron', sans-serif; font-size: 28px; 
-                    color: ${design.primary}; margin-bottom: 20px;">
-                    ${slide.title}
-                </h2>
-                <p style="font-family: 'Inter', sans-serif; font-size: 16px; 
-                    color: ${design.text}; line-height: 1.8;">
-                    ${slide.content}
-                </p>
-            </div>
-        `;
-    }
-
-    /**
-     * Создать миниатюру слайда для навигатора
-     */
-    createThumbnail(slide, index, isActive) {
-        const design = this.designSystem || APP_CONFIG.themes.cyberpunk;
-        
-        return `
-            <div class="slide-thumb" 
-                style="min-width: 180px; height: 100px; 
-                background: ${isActive ? design.surface : design.background}; 
-                border: 2px solid ${isActive ? design.primary : design.surface};
-                border-radius: 10px; padding: 12px; cursor: pointer;
-                transition: all 0.3s; position: relative; overflow: hidden;"
-                onclick="selectSlide(${index})"
-                onmouseover="this.style.borderColor='${design.primary}'; this.style.transform='translateY(-3px)';"
-                onmouseout="if(!${isActive}){this.style.borderColor='${design.surface}'; this.style.transform='translateY(0)';}">
-                
-                <!-- Мини-превью типа слайда -->
-                <div style="font-size: 20px; margin-bottom: 8px;">
-                    ${slide.type === 'hero' ? '🚀' : slide.type === 'cta' ? '🎯' : '📄'}
-                </div>
-                
-                <!-- Название -->
-                <p style="font-family: 'Inter', sans-serif; font-size: 11px; color: ${design.text};
-                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0;">
-                    ${slide.title}
-                </p>
-                
-                <!-- Индикатор активного -->
-                ${isActive ? `
-                    <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 3px;
-                        background: ${design.primary};"></div>
-                ` : ''}
-            </div>
-        `;
-    }
-
-    /**
-     * Создать полный набор миниатюр
-     */
-    createAllThumbnails(slides, activeIndex) {
-        return slides.map((slide, i) => 
-            this.createThumbnail(slide, i, i === activeIndex)
-        ).join('');
     }
 }
 
-// Создаём глобальный экземпляр
 const slideGenerator = new SlideGenerator();
 
-console.log('✅ Slide Generator initialized and ready');
+// Обработчик кликов по миниатюрам
+document.addEventListener('click', function(e) {
+    const thumb = e.target.closest('.slide-thumb');
+    if (thumb && typeof window.selectPresentationSlide === 'function') {
+        const idx = parseInt(thumb.getAttribute('data-slide-index'));
+        if (!isNaN(idx)) window.selectPresentationSlide(idx);
+    }
+});
+
+console.log('✅ Slide Generator v3.0 PRO готов');
