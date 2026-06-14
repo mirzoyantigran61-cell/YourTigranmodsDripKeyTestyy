@@ -2622,8 +2622,7 @@
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 
     <!-- AI Presentation Scripts -->
-<script src="shared/config.js"></script>
-<!-- AI Presentation Scripts (v5.0 PRO) -->
+<!-- AI Presentation Scripts v5.0 PRO -->
 <script src="shared/config.js"></script>
 <script src="ai-presentation/js/research-engine.js"></script>
 <script src="ai-presentation/js/structure-engine.js"></script>
@@ -2634,7 +2633,6 @@
 <script src="ai-presentation/js/orchestrator.js"></script>
 <script src="ai-presentation/js/slide-generator.js"></script>
 <script src="ai-presentation/js/pptx-export.js"></script>
-
 <!-- AI Presentation Integration -->
 <script>
 // ========================================
@@ -2718,20 +2716,20 @@ currentPresentation = {
     images: project.images
 };
         // Шаг 2: Генерация структуры слайдов
-        const slides = aiEngine.generateSlideStructure(analysis);
-        updatePresentationProgress(70);
-        presentationStatus.textContent = '🎨 Building preview...';
-        
-        // Сохраняем презентацию
-        currentPresentation = {
-            title: analysis.title,
-            subtitle: analysis.subtitle,
-            style: analysis.style,
-            designSystem: analysis.designSystem,
-            slides: slides,
-            author: currentUser.username,
-            createdAt: new Date().toISOString()
-        };
+        const project = await orchestrator.createPresentation(prompt, {
+    userImages: uploadedSlideImages || []
+});
+
+currentPresentation = {
+    title: project.title,
+    subtitle: project.subtitle,
+    style: project.context.style,
+    designSystem: project.designSystem,
+    slides: project.slides,
+    research: project.research,
+    images: project.images,
+    author: currentUser?.username || 'User'
+};
         
         // Настраиваем генератор слайдов
         slideGenerator.setDesignSystem(analysis.designSystem);
