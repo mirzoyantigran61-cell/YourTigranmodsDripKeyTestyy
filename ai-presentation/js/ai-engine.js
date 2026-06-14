@@ -1,6 +1,6 @@
 // ========================================
-// AI PRESENTATION ENGINE
-// Сердце AI — анализирует, планирует, генерирует
+// AI PRESENTATION ENGINE v3.0
+// Настоящая генерация через OpenAI
 // ========================================
 
 class AIPresentationEngine {
@@ -8,65 +8,135 @@ class AIPresentationEngine {
         this.currentPresentation = null;
         this.slides = [];
         this.designSystem = null;
-        this.isProcessing = false;
     }
 
     /**
-     * Главный метод — анализирует запрос пользователя
+     * Получить API ключ из поля ввода
+     */
+    getApiKey() {
+        const keyInput = document.getElementById('openaiApiKey');
+        if (keyInput && keyInput.value.trim()) {
+            return keyInput.value.trim();
+        }
+        // Запасной: из config (если есть)
+        if (APP_CONFIG.ai.openai.apiKey && APP_CONFIG.ai.openai.apiKey.length > 10) {
+            return APP_CONFIG.ai.openai.apiKey;
+        }
+        return null;
+    }
+
+    /**
+     * Главный метод — анализирует и генерирует ВСЁ через AI
      */
     async analyzePrompt(prompt) {
-    console.log('🔍 AI Engine: Analyzing prompt...');
-    
-    // Определяем стиль
-    const style = this.detectStyle(prompt);
-    const slideCount = this.extractSlideCount(prompt);
-    const topic = this.extractTopic(prompt);
-    const audience = this.detectAudience(prompt);
-    const purpose = this.detectPurpose(prompt);
-    this.designSystem = APP_CONFIG.themes[style] || APP_CONFIG.themes.cyberpunk;
-    
-    // Пробуем OpenAI API
-    try {
-        const enhanced = await this.callOpenAI(prompt);
-        if (enhanced) {
-            console.log('✅ OpenAI enhancement applied!');
-            return {
-                ...enhanced,
-                style: style,
-                slideCount: slideCount,
-                designSystem: this.designSystem
-            };
+        console.log('🔍 AI Engine v3.0: Full AI Generation...');
+        
+        const apiKey = this.getApiKey();
+        
+        if (!apiKey) {
+            throw new Error('Please enter your OpenAI API key to use AI features.');
         }
-    } catch (e) {
-        console.log('⚠️ OpenAI fallback:', e.message);
+        
+        // Определяем стиль локально
+        const style = this.detectStyle(prompt);
+        const slideCount = this.extractSlideCount(prompt);
+        this.designSystem = APP_CONFIG.themes[style] || APP_CONFIG.themes.cyberpunk;
+        
+        // Генерируем ВСЁ через OpenAI
+        const aiResult = await this.generateFullPresentation(prompt, slideCount, apiKey);
+        
+        return {
+            ...aiResult,
+            style: style,
+            slideCount: slideCount,
+            designSystem: this.designSystem
+        };
     }
-    
-    // Локальный анализ
-    return {
-        topic: topic,
-        style: style,
-        slideCount: slideCount,
-        audience: audience,
-        purpose: purpose,
-        title: this.generateTitle(prompt, topic),
-        subtitle: this.generateSubtitle(audience, purpose),
-        designSystem: this.designSystem
-    };
-}
 
     /**
-     * Определяет стиль презентации из запроса
+     * Генерация ПОЛНОЙ презентации через OpenAI
+     */
+    async generateFullPresentation(prompt, slideCount, apiKey) {
+        console.log('🤖 Calling OpenAI for FULL presentation generation...');
+        
+        const systemPrompt = `You are a professional presentation designer AI.
+        
+        Create a COMPLETE presentation with DETAILED content for each slide.
+        
+        IMPORTANT RULES:
+        - Generate EXACTLY ${slideCount} slides
+        - Each slide MUST have a title AND detailed content (3-5 sentences minimum)
+        - Content must be SPECIFIC to the topic, not generic templates
+        - Include facts, statistics, examples where relevant
+        - Use professional language
+        
+        Return ONLY valid JSON in this exact format:
+        {
+            "title": "Catchy Presentation Title",
+            "subtitle": "Descriptive subtitle",
+            "slides": [
+                {
+                    "title": "Slide Title Here",
+                    "content": "Detailed paragraph about this slide topic. Include specific information, facts, and insights. Make it informative and engaging. At least 3-4 sentences.",
+                    "type": "hero"
+                },
+                {
+                    "title": "Another Slide",
+                    "content": "Another detailed paragraph with specific information about this topic. Include relevant details and explanations.",
+                    "type": "content"
+                }
+            ]
+        }
+        
+        Slide types: "hero" (first slide), "cta" (last slide), "content" (middle slides).
+        Make the first slide type "hero" and the last slide type "cta".`;
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini', // Быстрая и дешёвая модель
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: prompt }
+                ],
+                max_tokens: 4000,
+                temperature: 0.8
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error?.message || 'OpenAI API error');
+        }
+
+        const data = await response.json();
+        const content = data.choices[0].message.content;
+        
+        // Парсим JSON
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('Invalid AI response format');
+        
+        const parsed = JSON.parse(jsonMatch[0]);
+        
+        console.log(`✅ AI generated ${parsed.slides.length} slides with full content!`);
+        
+        return parsed;
+    }
+
+    /**
+     * Определяет стиль из запроса
      */
     detectStyle(prompt) {
         const lower = prompt.toLowerCase();
-        
         if (lower.includes('cyberpunk') || lower.includes('neon') || lower.includes('киберпанк')) return 'cyberpunk';
         if (lower.includes('gaming') || lower.includes('game') || lower.includes('игр')) return 'gaming';
         if (lower.includes('modern') || lower.includes('minimal') || lower.includes('современ')) return 'modern';
         if (lower.includes('business') || lower.includes('corporate') || lower.includes('бизнес')) return 'modern';
-        if (lower.includes('startup') || lower.includes('стартап') || lower.includes('pitch')) return 'modern';
-        
-        return 'cyberpunk'; // Твой стандартный стиль
+        return 'cyberpunk';
     }
 
     /**
@@ -78,250 +148,51 @@ class AIPresentationEngine {
             /(?:slide|слайд)[\s\-]*(\d+)/i,
             /(\d+)[\s\-]*(?:page|страниц)/i
         ];
-        
         for (const pattern of patterns) {
             const match = prompt.match(pattern);
             if (match) {
                 const count = parseInt(match[1]);
-                return Math.min(Math.max(count, 3), APP_CONFIG.presentation.maxSlides);
+                return Math.min(Math.max(count, 3), 30);
             }
         }
-        
-        return APP_CONFIG.presentation.defaultSlideCount;
+        return 5; // По умолчанию 5 слайдов
     }
 
     /**
-     * Извлекает тему
-     */
-    extractTopic(prompt) {
-        // Убираем технические слова
-        const clean = prompt
-            .replace(/(?:create|make|generate|build|сделай|создай)\s+(?:a|an|the|me|мне)?\s*/gi, '')
-            .replace(/(?:presentation|презентаци[юя])\s+(?:about|про|о|на тему)?\s*/gi, '')
-            .replace(/(?:with|in|с|в)\s+(?:\d+\s*(?:slide|слайд).*?style.*$)/gi, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-        
-        // Берём первые 5-7 слов
-        const words = clean.split(' ').slice(0, 7);
-        let topic = words.join(' ');
-        
-        // Делаем первую букву заглавной
-        topic = topic.charAt(0).toUpperCase() + topic.slice(1);
-        
-        return topic || 'Professional Presentation';
-    }
-
-    /**
-     * Определяет аудиторию
-     */
-    detectAudience(prompt) {
-        const lower = prompt.toLowerCase();
-        
-        if (lower.includes('investor') || lower.includes('инвестор') || lower.includes('pitch')) return 'Investors';
-        if (lower.includes('student') || lower.includes('school') || lower.includes('студент') || lower.includes('школ')) return 'Students';
-        if (lower.includes('client') || lower.includes('клиент') || lower.includes('customer')) return 'Clients';
-        if (lower.includes('team') || lower.includes('команд') || lower.includes('employee')) return 'Team';
-        if (lower.includes('gamer') || lower.includes('игрок') || lower.includes('gaming')) return 'Gamers';
-        
-        return 'General Audience';
-    }
-
-    /**
-     * Определяет цель презентации
-     */
-    detectPurpose(prompt) {
-        const lower = prompt.toLowerCase();
-        
-        if (lower.includes('sell') || lower.includes('прода') || lower.includes('pitch')) return 'Pitch / Sell';
-        if (lower.includes('educate') || lower.includes('teach') || lower.includes('обуч') || lower.includes('учеб')) return 'Educational';
-        if (lower.includes('report') || lower.includes('отчёт') || lower.includes('отчет')) return 'Report';
-        if (lower.includes('inspire') || lower.includes('motivate') || lower.includes('вдохнов')) return 'Inspirational';
-        
-        return 'Informational';
-    }
-
-    /**
-     * Генерирует заголовок
-     */
-    generateTitle(prompt, topic) {
-        // Если есть вопросительный знак — делаем заголовок-ответ
-        if (prompt.includes('?')) {
-            return topic.replace(/^What is |^How to |^Why /i, '');
-        }
-        
-        // Если тема короткая — добавляем усиление
-        if (topic.split(' ').length <= 2) {
-            const boosters = [
-                `The Ultimate Guide to ${topic}`,
-                `${topic}: A Complete Overview`,
-                `Mastering ${topic}`,
-                `${topic} Revolution`,
-                `The Future of ${topic}`
-            ];
-            return boosters[Math.floor(Math.random() * boosters.length)];
-        }
-        
-        return topic;
-    }
-
-    /**
-     * Генерирует подзаголовок
-     */
-    generateSubtitle(audience, purpose) {
-        const subtitles = {
-            'Investors': 'Investment Opportunity Overview',
-            'Students': 'Learning & Development Guide',
-            'Clients': 'Solution Overview & Benefits',
-            'Team': 'Team Strategy & Roadmap',
-            'Gamers': 'Gaming Evolution & Features',
-            'General Audience': 'Comprehensive Overview & Insights'
-        };
-        
-        return `${subtitles[audience] || subtitles['General Audience']} | ${purpose}`;
-    }
-
-    /**
-     * Вызов AI API для улучшения результатов
-     */
-    /**
- * Вызов OpenAI API
- */
-async callOpenAI(prompt) {
-    const config = APP_CONFIG.ai.openai;
-    
-    console.log('🤖 Calling OpenAI API...');
-    
-    const response = await fetch(config.endpoint, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${config.apiKey}`
-        },
-        body: JSON.stringify({
-            model: APP_CONFIG.ai.model,
-            messages: [
-                {
-                    role: 'system',
-                    content: `You are a professional presentation designer AI. 
-                    Create presentation structures with titles, subtitles, and slide content.
-                    Always return valid JSON with this format:
-                    {
-                        "title": "Presentation Title",
-                        "subtitle": "Subtitle or description",
-                        "slides": [
-                            {"title": "Slide 1", "content": "Content here", "type": "hero"},
-                            {"title": "Slide 2", "content": "Content here", "type": "content"}
-                        ]
-                    }`
-                },
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
-            max_tokens: APP_CONFIG.ai.maxTokens,
-            temperature: APP_CONFIG.ai.temperature
-        })
-    });
-    
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'API error');
-    }
-    
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-    
-    // Парсим JSON из ответа
-    try {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            console.log('✅ OpenAI response parsed:', parsed.title);
-            return parsed;
-        }
-    } catch (parseError) {
-        console.log('⚠️ Could not parse JSON, using raw text');
-    }
-    
-    return null;
-}
-
-    /**
-     * Генерирует полную структуру слайдов
+     * Генерирует структуру слайдов из AI результата
      */
     generateSlideStructure(analysis) {
-        const { topic, slideCount, audience, purpose, style } = analysis;
+        if (!analysis.slides || analysis.slides.length === 0) {
+            return this.fallbackStructure(analysis);
+        }
+        
+        return analysis.slides.map((slide, i) => ({
+            id: i + 1,
+            type: slide.type || (i === 0 ? 'hero' : i === analysis.slides.length - 1 ? 'cta' : 'content'),
+            title: slide.title,
+            content: slide.content,
+            layout: i === 0 ? 'hero' : i === analysis.slides.length - 1 ? 'cta' : 'content',
+            imagePrompt: this.generateImagePrompt(slide.title, analysis.style || 'cyberpunk'),
+            speakerNotes: `Present this slide about "${slide.title}" with confidence. ${slide.content ? slide.content.substring(0, 100) : ''}...`,
+            index: i
+        }));
+    }
+
+    /**
+     * Запасная структура если AI не сработал
+     */
+    fallbackStructure(analysis) {
         const slides = [];
+        const titles = ['Introduction', 'Overview', 'Key Points', 'Analysis', 'Conclusion'];
         
-        // Шаблоны структур под разные цели
-        const structures = {
-            'Pitch / Sell': [
-                'Problem Statement',
-                'Our Solution',
-                'Market Opportunity',
-                'How It Works',
-                'Competitive Advantage',
-                'Business Model',
-                'Traction & Results',
-                'Team',
-                'Financial Projections',
-                'Call to Action'
-            ],
-            'Educational': [
-                'Learning Objectives',
-                'Key Concepts',
-                'Core Principles',
-                'Practical Examples',
-                'Case Studies',
-                'Common Mistakes',
-                'Best Practices',
-                'Tools & Resources',
-                'Summary & Takeaways',
-                'Q&A'
-            ],
-            'Report': [
-                'Executive Summary',
-                'Methodology',
-                'Key Findings',
-                'Data Analysis',
-                'Trends & Patterns',
-                'Recommendations',
-                'Implementation Plan',
-                'Expected Outcomes',
-                'Next Steps',
-                'Appendix'
-            ],
-            'default': [
-                'Introduction',
-                'Overview',
-                'Key Points',
-                'Deep Dive',
-                'Analysis',
-                'Examples',
-                'Benefits',
-                'Future Outlook',
-                'Conclusion',
-                'Thank You'
-            ]
-        };
-        
-        const structure = structures[purpose] || structures['default'];
-        const actualCount = Math.min(slideCount, structure.length);
-        
-        for (let i = 0; i < actualCount; i++) {
-            const isFirst = i === 0;
-            const isLast = i === actualCount - 1;
-            
+        for (let i = 0; i < titles.length; i++) {
             slides.push({
                 id: i + 1,
-                type: isFirst ? 'hero' : (isLast ? 'cta' : 'content'),
-                title: isFirst ? analysis.title : structure[i],
-                content: isFirst ? analysis.subtitle : this.generateSlideContent(structure[i], analysis),
-                layout: this.pickLayout(i, actualCount),
-                imagePrompt: this.generateImagePrompt(structure[i], style),
-                speakerNotes: this.generateSpeakerNote(structure[i], audience),
+                type: i === 0 ? 'hero' : i === titles.length - 1 ? 'cta' : 'content',
+                title: analysis.title || titles[i],
+                content: `Content for ${titles[i].toLowerCase()} about ${analysis.topic || 'this topic'}.`,
+                layout: i === 0 ? 'hero' : i === titles.length - 1 ? 'cta' : 'content',
+                speakerNotes: `Present this slide clearly and confidently.`,
                 index: i
             });
         }
@@ -330,74 +201,20 @@ async callOpenAI(prompt) {
     }
 
     /**
-     * Генерирует контент для слайда
-     */
-    generateSlideContent(title, analysis) {
-        const templates = [
-            `Overview of ${title.toLowerCase()} for ${analysis.audience}`,
-            `Key aspects and important information about ${title.toLowerCase()}`,
-            `Detailed analysis of ${title.toLowerCase()} in the context of ${analysis.topic}`,
-            `Practical insights and actionable strategies for ${title.toLowerCase()}`
-        ];
-        
-        return templates[Math.floor(Math.random() * templates.length)];
-    }
-
-    /**
-     * Выбирает лэйаут для слайда
-     */
-    pickLayout(index, total) {
-        if (index === 0) return 'hero';
-        if (index === total - 1) return 'cta';
-        return index % 2 === 0 ? 'two_column' : 'title_content';
-    }
-
-    /**
      * Генерирует промпт для изображения
      */
     generateImagePrompt(title, style) {
         const stylePrompts = {
-            cyberpunk: 'cyberpunk style, neon lighting, dark futuristic city, holographic elements, rain, volumetric fog',
-            gaming: 'gaming aesthetic, RGB lighting, epic composition, game art style, dynamic',
-            modern: 'modern minimalist, clean design, professional lighting, sleek, corporate'
+            cyberpunk: 'cyberpunk style, neon lighting, dark futuristic, holographic, 8K',
+            gaming: 'gaming aesthetic, RGB, epic, game art, dynamic, 8K',
+            modern: 'modern minimalist, clean, professional, sleek, 8K'
         };
-        
         const baseStyle = stylePrompts[style] || stylePrompts.cyberpunk;
-        return `${title} — ${baseStyle}, 8K quality, cinematic, professional presentation background`;
+        return `${title} — ${baseStyle}, cinematic, professional presentation background`;
     }
 
-    /**
-     * Генерирует заметки для спикера
-     */
-    generateSpeakerNote(title, audience) {
-        const notes = {
-            'Investors': `Present "${title}" with confidence. Focus on ROI and market opportunity. Be ready for questions about numbers and traction.`,
-            'Students': `Explain "${title}" clearly. Use simple examples. Check for understanding before moving on.`,
-            'Clients': `Present "${title}" focusing on benefits and solutions. Address pain points. Be consultative.`,
-            'Gamers': `Present "${title}" with energy and excitement. Use gaming references. Keep it engaging.`,
-            'default': `Present "${title}" clearly and confidently. Make eye contact. Engage the audience with questions.`
-        };
-        
-        return notes[audience] || notes['default'];
-    }
-
-    /**
-     * Получить текущую презентацию
-     */
-    getPresentation() {
-        return this.currentPresentation;
-    }
-
-    /**
-     * Получить конкретный слайд
-     */
-    getSlide(index) {
-        return this.slides[index] || null;
-    }
-
-    /**
-     * Обновить слайд
-     */
+    getPresentation() { return this.currentPresentation; }
+    getSlide(index) { return this.slides[index] || null; }
     updateSlide(index, updates) {
         if (this.slides[index]) {
             this.slides[index] = { ...this.slides[index], ...updates };
@@ -405,7 +222,5 @@ async callOpenAI(prompt) {
     }
 }
 
-// Создаём глобальный экземпляр
 const aiEngine = new AIPresentationEngine();
-
-console.log('✅ AI Engine initialized and ready');
+console.log('✅ AI Engine v3.0 ready — Full AI Generation Mode');
