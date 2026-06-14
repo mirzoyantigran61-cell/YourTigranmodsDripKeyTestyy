@@ -16,7 +16,7 @@ const APP_CONFIG = {
     
     // OpenAI API
     openai: {
-        apiKey: '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',
+        apiKey: '',
         endpoint: 'https://api.openai.com/v1/chat/completions'
     },
     
